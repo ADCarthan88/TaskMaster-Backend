@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
+import { createServer } from 'http';
 
 // Import routes
 import authRoutes from './routes/auth';
@@ -14,15 +15,22 @@ import categoryRoutes from './routes/categories';
 import { errorHandler } from './middleware/errorHandler';
 import { notFound } from './middleware/notFound';
 
+// Import WebSocket service
+import WebSocketService from './services/websocket';
+
 // Load environment variables
 dotenv.config();
 
 // Initialize Prisma client
 export const prisma = new PrismaClient();
 
-// Create Express app
+// Create Express app and HTTP server
 const app = express();
+const server = createServer(app);
 const PORT = process.env.PORT || 3000;
+
+// Initialize WebSocket service
+export const wsService = new WebSocketService(server);
 
 // Rate limiting
 const limiter = rateLimit({
@@ -41,6 +49,9 @@ app.use(limiter); // Apply rate limiting
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// Serve uploaded files statically
+app.use('/uploads', express.static('uploads'));
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({
@@ -50,10 +61,16 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Import notification and attachment routes
+import notificationRoutes from './routes/notifications';
+import attachmentRoutes from './routes/attachments';
+
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/attachments', attachmentRoutes);
 
 // Error handling middleware
 app.use(notFound);
@@ -73,10 +90,11 @@ process.on('SIGTERM', async () => {
 });
 
 // Start server
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🚀 TaskMaster API server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔌 WebSocket server ready for real-time updates`);
 });
 
 export default app;

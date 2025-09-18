@@ -1,5 +1,5 @@
 import express from 'express';
-import { prisma } from '../server';
+import { prisma, wsService } from '../server';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { createCategorySchema, updateCategorySchema } from '../utils/validation';
 
@@ -39,6 +39,9 @@ router.post('/', async (req: AuthRequest, res, next) => {
       data: { ...value, userId: req.user!.id },
     });
 
+    // Emit WebSocket event for real-time updates
+    wsService.emitCategoryCreated(req.user!.id, category);
+
     res.status(201).json({
       success: true,
       data: { category },
@@ -76,6 +79,9 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
       where: { id: req.params.id },
     });
 
+    // Emit WebSocket event for real-time updates
+    wsService.emitCategoryUpdated(req.user!.id, updatedCategory);
+
     res.status(200).json({
       success: true,
       data: { category: updatedCategory },
@@ -99,6 +105,9 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
         error: { message: 'Category not found' },
       });
     }
+
+    // Emit WebSocket event for real-time updates
+    wsService.emitCategoryDeleted(req.user!.id, req.params.id);
 
     res.status(200).json({
       success: true,

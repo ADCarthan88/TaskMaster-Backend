@@ -1,6 +1,6 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import { prisma } from '../server';
 import { registerSchema, loginSchema } from '../utils/validation';
 
@@ -67,9 +67,9 @@ router.post('/register', async (req, res, next) => {
     }
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, username: user.username },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      { userId: user.id, email: user.email, username: user.username },
+      process.env.JWT_SECRET!,
+      { expiresIn: '7d' }
     );
 
     res.status(201).json({
@@ -126,9 +126,9 @@ router.post('/login', async (req, res, next) => {
     }
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, username: user.username },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      { userId: user.id, email: user.email, username: user.username },
+      process.env.JWT_SECRET!,
+      { expiresIn: '7d' }
     );
 
     // Return user data (excluding password)

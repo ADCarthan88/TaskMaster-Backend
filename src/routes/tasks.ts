@@ -1,8 +1,8 @@
 import express from 'express';
-import { prisma } from '../server';
+import { prisma, wsService } from '../server';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { createTaskSchema, updateTaskSchema, taskQuerySchema } from '../utils/validation';
-import { Priority } from '@prisma/client';
+// Remove Priority enum import since we're using strings now
 
 const router = express.Router();
 
@@ -178,7 +178,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
       data: {
         title,
         description,
-        priority: priority as Priority,
+        priority: priority as string,
         dueDate: dueDate ? new Date(dueDate) : null,
         categoryId,
         userId: req.user!.id,
@@ -193,6 +193,9 @@ router.post('/', async (req: AuthRequest, res, next) => {
         },
       },
     });
+
+    // Emit WebSocket event for real-time updates
+    wsService.emitTaskCreated(req.user!.id, task);
 
     res.status(201).json({
       success: true,
@@ -259,7 +262,7 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
         ...(title !== undefined && { title }),
         ...(description !== undefined && { description }),
         ...(completed !== undefined && { completed }),
-        ...(priority !== undefined && { priority: priority as Priority }),
+        ...(priority !== undefined && { priority: priority as string }),
         ...(dueDate !== undefined && { dueDate: dueDate ? new Date(dueDate) : null }),
         ...(categoryId !== undefined && { categoryId }),
       },
@@ -273,6 +276,9 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
         },
       },
     });
+
+    // Emit WebSocket event for real-time updates
+    wsService.emitTaskUpdated(req.user!.id, task);
 
     res.status(200).json({
       success: true,
@@ -308,6 +314,9 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
     await prisma.task.delete({
       where: { id },
     });
+
+    // Emit WebSocket event for real-time updates
+    wsService.emitTaskDeleted(req.user!.id, id);
 
     res.status(200).json({
       success: true,
@@ -345,6 +354,26 @@ router.patch('/bulk', async (req: AuthRequest, res, next) => {
       },
       data: { completed },
     });
+
+    // Get updated tasks for WebSocket emission
+    const updatedTasks = await prisma.task.findMany({
+      where: {
+        id: { in: taskIds },
+        userId: req.user!.id,
+      },
+      include: {
+        category: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+          },
+        },
+      },
+    });
+
+    // Emit WebSocket event for bulk update
+    wsService.emitTaskBulkUpdate(req.user!.id, updatedTasks);
 
     res.status(200).json({
       success: true,
